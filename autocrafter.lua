@@ -207,7 +207,7 @@ local function has_room_for_output(list_output, index_output)
 	return true
 end
 
-local function autocraft(inventory, craft)
+local function autocraft(inventory, craft,pos)
 	if not craft then return false end
 
 	-- check if output and all replacements fit in dst
@@ -223,9 +223,17 @@ local function autocraft(inventory, craft)
 	-- check if we have enough material available
 	local inv_index = count_index(inventory:get_list("src"))
 	local consumption = calculate_consumption(inv_index, craft.consumption)
+	
 	if not consumption then
 		return false
 	end
+		-- BLOCk (Riserve 1 item)
+	if core.get_meta(pos):get_int("reserve") == 1 then
+		for item, num in pairs(consumption) do
+			if (inv_index[item] or 0) <= num then return false end
+		end
+	end
+
 
 	-- consume material
 	for itemname, number in pairs(consumption) do
@@ -263,7 +271,7 @@ local function run_autocrafter(pos, elapsed)
 	end
 
 	for _ = 1, math.floor(elapsed / craft_time) do
-		local continue = autocraft(inventory, craft)
+		local continue = autocraft(inventory, craft,pos)
 		if not continue then return false end
 	end
 	return true
@@ -344,10 +352,17 @@ local function on_output_change(pos, inventory, stack)
 end
 
 -- returns false if we shouldn't bother attempting to start the timer again
--- after this
+
 local function update_meta(meta, enabled)
 	local state = enabled and "on" or "off"
 	meta:set_int("enabled", enabled and 1 or 0)
+	
+	-- Reserve State
+	local res_state = meta:get_int("reserve") == 1
+	local res_icon = res_state and "pipeworks_button_on.png" or "pipeworks_button_off.png"
+	local res_status_txt = res_state and S("RESERVE: ON") or S("RESERVE: OFF")
+	local res_tooltip = res_status_txt .. "\n" .. S("Keep 1 item in slot to prevent other items from filling it.")
+
 	local list_backgrounds = ""
 	if core.get_modpath("i3") or core.get_modpath("mcl_formspec") then
 		list_backgrounds = "style_type[box;colors=#666]"
@@ -370,6 +385,7 @@ local function update_meta(meta, enabled)
 			end
 		end
 	end
+
 	local size = "10.2,14"
 	local fs =
 		"formspec_version[2]" ..
@@ -379,8 +395,11 @@ local function update_meta(meta, enabled)
 		"list[context;recipe;0.22,0.22;3,3;]" ..
 		"image[4,1.45;1,1;[combine:16x16^[noalpha^[colorize:#141318:255]" ..
 		"list[context;output;4,1.45;1,1;]" ..
-		"image_button[4,2.6;1,0.6;pipeworks_button_" .. state .. ".png;" ..
-		state .. ";;;false;pipeworks_button_interm.png]" ..
+		"image_button[4.1,2.6;0.8,0.5;pipeworks_button_" .. state .. ".png;" .. state .. ";;;false;pipeworks_button_interm.png]" ..
+		"image_button[4.1,3.1;0.8,0.5;" .. res_icon .. ";btn_reserve;;;false;pipeworks_button_interm.png]" ..
+		"style[label_res;font_size=12]" .. 
+		"label[3.6,3.95;" .. res_status_txt .. "]" ..
+		"tooltip[btn_reserve;" .. res_tooltip .. "]" ..
 		"list[context;dst;5.28,0.22;4,3;]" ..
 		"list[context;src;0.22,5;8,3;]" ..
 		pipeworks.fs_helpers.get_inv(9) ..
@@ -389,30 +408,36 @@ local function update_meta(meta, enabled)
 		"listring[current_player;main]" ..
 		"listring[context;dst]" ..
 		"listring[current_player;main]"
+
 	if core.get_modpath("digilines") then
-		fs = fs .. "field[0.22,4.1;4.5,0.75;channel;" .. S("Channel") ..
-			";${channel}]" ..
-			"button[5,4.1;2,0.75;set_channel;" .. S("Set") .. "]" ..
-			"button_exit[7.2,4.1;2,0.75;close;" .. S("Close") .. "]"
+		
+		fs = fs .. "field[0.22,4.1;4.0,0.5;channel;" .. S("Channel") .. ";${channel}]" ..
+			"button[4.5,4.1;1.2,0.5;set_channel;" .. S("Set") .. "]" ..
+			"button_exit[6.0,4.1;1.5,0.5;close;" .. S("Close") .. "]"
 	end
 	meta:set_string("formspec", fs)
 
-	-- toggling the button doesn't quite call for running a recipe change check
-	-- so instead we run a minimal version for infotext setting only
-	-- this might be more written code, but actually executes less
-	local output = meta:get_inventory():get_stack("output", 1)
-	if output:is_empty() then -- doesn't matter if paused or not
+	local output_stack = meta:get_inventory():get_stack("output", 1)
+	if output_stack:is_empty() then
 		meta:set_string("infotext", S("unconfigured Autocrafter"))
 		return false
 	end
 
-	local description, name = get_item_info(output)
+	local description, name = get_item_info(output_stack)
 	local infotext = enabled and S("'@1' Autocrafter (@2)", description, name)
 				or S("paused '@1' Autocrafter", description)
 
 	meta:set_string("infotext", infotext)
 	return enabled
 end
+
+
+
+
+
+
+
+
 
 -- 1st version of the autocrafter had actual items in the crafting grid
 -- the 2nd replaced these with virtual items, dropped the content on update and
@@ -484,6 +509,8 @@ core.register_node("pipeworks:autocrafter", {
 		inv:set_size("recipe", 3 * 3)
 		inv:set_size("dst", 4 * 3)
 		inv:set_size("output", 1)
+				meta:set_int("reserve", 0)
+
 		update_meta(meta, false)
 	end,
 	on_receive_fields = function(pos, formname, fields, sender)
@@ -493,6 +520,8 @@ core.register_node("pipeworks:autocrafter", {
 			return
 		end
 		local meta = core.get_meta(pos)
+		
+		-- Machine on/off management
 		if fields.on then
 			update_meta(meta, false)
 			core.get_node_timer(pos):stop()
@@ -501,10 +530,22 @@ core.register_node("pipeworks:autocrafter", {
 				start_crafter(pos)
 			end
 		end
+		
+		-- Channel Management (if present)
 		if fields.channel then
 			meta:set_string("channel", fields.channel)
 		end
+
+		--new: Gestion Button Reserve
+		if fields.btn_reserve then
+			local current_res = meta:get_int("reserve")
+			local new_res = (current_res == 1 and 0 or 1)
+			meta:set_int("reserve", new_res)
+			-- Aggiorna l'interfaccia per mostrare il cambio colore
+			update_meta(meta, meta:get_int("enabled") == 1)
+		end
 	end,
+
 	can_dig = function(pos, player)
 		upgrade_autocrafter(pos)
 		local meta = core.get_meta(pos)
