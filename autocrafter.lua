@@ -207,58 +207,57 @@ local function has_room_for_output(list_output, index_output)
 	return true
 end
 
-local function autocraft(inventory, craft,pos)
+local function autocraft(inventory, craft, pos)
 	if not craft then return false end
 
-	-- check if output and all replacements fit in dst
 	local output = craft.output.item
 	local out_items = count_index(craft.decremented_input)
-	out_items[output:get_name()] =
-			(out_items[output:get_name()] or 0) + output:get_count()
+	out_items[output:get_name()] = (out_items[output:get_name()] or 0) + output:get_count()
 
 	if not has_room_for_output(inventory:get_list("dst"), out_items) then
 		return false
 	end
-
-	-- check if we have enough material available
-	local inv_index = count_index(inventory:get_list("src"))
+	local inv_list = inventory:get_list("src")
+	local inv_index = count_index(inv_list)
 	local consumption = calculate_consumption(inv_index, craft.consumption)
+	
 	if not consumption then
 		return false
 	end
-
 	--Excludes buckets and non-stackable items
+	--LOGIC OF THE ADDED RESERVE
 	local meta = core.get_meta(pos)
 	if meta:get_int("reserve") == 1 then
+		local total_in_inv = 0
+		local total_needed = 0
+		
 		for itemname, number in pairs(consumption) do
 			local def = core.registered_items[itemname]
 			local stack_max = def and def.stack_max or 1
-			--If it is a bucket or a non-stackable iterm , we ignore it and use it normally
+			
+			--If the object is stackable
 			if stack_max > 1 then
-				if (inv_index[itemname] or 0) <= number then 
-					return false 
-				end
+				total_needed = total_needed + number
+				total_in_inv = total_in_inv + (inv_index[itemname] or 0)
 			end
+		end
+
+		--If the total does not exceed the required total by at least 1, we stop.
+		if total_needed > 0 and total_in_inv <= total_needed then
+			return false
 		end
 	end
 
-	-- consume material
+	--Consumption of objects
 	for itemname, number in pairs(consumption) do
-		-- We have to do that since remove_item does not work if count > stack_max
 		for _ = 1, number do
 			inventory:remove_item("src", ItemStack(itemname))
 		end
 	end
 
-	-- craft the result into the dst inventory and add any "replacements" as well
 	inventory:add_item("dst", output)
-	local leftover
 	for i = 1, 9 do
-		leftover = inventory:add_item("dst", craft.decremented_input[i])
-		if leftover and not leftover:is_empty() then
-			core.log("warning", "[pipeworks] autocrafter didn't " ..
-				"calculate output space correctly.")
-		end
+		inventory:add_item("dst", craft.decremented_input[i])
 	end
 	return true
 end
