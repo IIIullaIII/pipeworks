@@ -18,9 +18,10 @@ unconfigured Autocrafter=Autocrafter non configurato
 Save=Salva
 paused '@1' Autocrafter=Autocrafter di '@1' in pausa
 Autocrafter=Autocrafter
+
 # NUOVE TRADUZIONI PER LA RISERVA:
-RESERVE: ON=RISERVA: ON
-RESERVE: OFF=RISERVA: OFF
+Reserve: ON=Riserva: ON
+Reserve: OFF=Riserva: OFF
 Keep 1 item in slot to prevent other items from filling it.=Mantieni 1 pezzo nello slot per evitare che altri oggetti lo riempiano.
 
 ## devices

@@ -223,17 +223,24 @@ local function autocraft(inventory, craft,pos)
 	-- check if we have enough material available
 	local inv_index = count_index(inventory:get_list("src"))
 	local consumption = calculate_consumption(inv_index, craft.consumption)
-	
 	if not consumption then
 		return false
 	end
-		-- BLOCk (Riserve 1 item)
-	if core.get_meta(pos):get_int("reserve") == 1 then
-		for item, num in pairs(consumption) do
-			if (inv_index[item] or 0) <= num then return false end
+
+	--Excludes buckets and non-stackable items
+	local meta = core.get_meta(pos)
+	if meta:get_int("reserve") == 1 then
+		for itemname, number in pairs(consumption) do
+			local def = core.registered_items[itemname]
+			local stack_max = def and def.stack_max or 1
+			--If it is a bucket or a non-stackable iterm , we ignore it and use it normally
+			if stack_max > 1 then
+				if (inv_index[itemname] or 0) <= number then 
+					return false 
+				end
+			end
 		end
 	end
-
 
 	-- consume material
 	for itemname, number in pairs(consumption) do
@@ -360,7 +367,7 @@ local function update_meta(meta, enabled)
 	-- Reserve State
 	local res_state = meta:get_int("reserve") == 1
 	local res_icon = res_state and "pipeworks_button_on.png" or "pipeworks_button_off.png"
-	local res_status_txt = res_state and S("RESERVE: ON") or S("RESERVE: OFF")
+	local res_status_txt = res_state and S("Reserve: ON") or S("Reserve: OFF")
 	local res_tooltip = res_status_txt .. "\n" .. S("Keep 1 item in slot to prevent other items from filling it.")
 
 	local list_backgrounds = ""
@@ -422,7 +429,6 @@ local function update_meta(meta, enabled)
 		meta:set_string("infotext", S("unconfigured Autocrafter"))
 		return false
 	end
-
 	local description, name = get_item_info(output_stack)
 	local infotext = enabled and S("'@1' Autocrafter (@2)", description, name)
 				or S("paused '@1' Autocrafter", description)
@@ -430,14 +436,6 @@ local function update_meta(meta, enabled)
 	meta:set_string("infotext", infotext)
 	return enabled
 end
-
-
-
-
-
-
-
-
 
 -- 1st version of the autocrafter had actual items in the crafting grid
 -- the 2nd replaced these with virtual items, dropped the content on update and
@@ -509,8 +507,7 @@ core.register_node("pipeworks:autocrafter", {
 		inv:set_size("recipe", 3 * 3)
 		inv:set_size("dst", 4 * 3)
 		inv:set_size("output", 1)
-				meta:set_int("reserve", 0)
-
+		meta:set_int("reserve", 0)
 		update_meta(meta, false)
 	end,
 	on_receive_fields = function(pos, formname, fields, sender)
@@ -536,12 +533,12 @@ core.register_node("pipeworks:autocrafter", {
 			meta:set_string("channel", fields.channel)
 		end
 
-		--new: Gestion Button Reserve
+		-- Reserve button management
 		if fields.btn_reserve then
 			local current_res = meta:get_int("reserve")
 			local new_res = (current_res == 1 and 0 or 1)
 			meta:set_int("reserve", new_res)
-			-- Aggiorna l'interfaccia per mostrare il cambio colore
+			-- Update the interface to show color change
 			update_meta(meta, meta:get_int("enabled") == 1)
 		end
 	end,
