@@ -431,11 +431,9 @@ local function update_meta(meta, enabled)
 	local description, name = get_item_info(output_stack)
 	local infotext = enabled and S("'@1' Autocrafter (@2)", description, name)
 				or S("paused '@1' Autocrafter", description)
-
 	meta:set_string("infotext", infotext)
 	return enabled
 end
-
 -- 1st version of the autocrafter had actual items in the crafting grid
 -- the 2nd replaced these with virtual items, dropped the content on update and
 --   set "virtual_items" to string "1"
