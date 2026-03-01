@@ -277,7 +277,7 @@ local function run_autocrafter(pos, elapsed)
 	end
 
 	for _ = 1, math.floor(elapsed / craft_time) do
-		local continue = autocraft(inventory, craft,pos)
+		local continue = autocraft(inventory, craft, pos)
 		if not continue then return false end
 	end
 	return true
