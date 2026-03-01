@@ -25,8 +25,8 @@ local function get_item_info(stack)
 	return description, name
 end
 
--- Get best matching recipe for what user has put in crafting grid.
--- This function does not consider crafting method (mix vs craft)
+-- get best matching recipe for what user has put in crafting grid.
+-- this function does not consider crafting method (mix vs craft)
 local function get_matching_craft(output_name, example_recipe)
 	local recipes = core.get_all_craft_recipes(output_name)
 	if not recipes then
@@ -92,7 +92,7 @@ local function get_craft(pos, inventory, hash)
 	return craft
 end
 
--- From a consumption table with groups and an inventory index,
+-- from a consumption table with groups and an inventory index,
 -- build a consumption table without groups
 local function calculate_consumption(inv_index, consumption_with_groups)
 	inv_index = table.copy(inv_index)
@@ -103,8 +103,8 @@ local function calculate_consumption(inv_index, consumption_with_groups)
 	-- table of ingredients defined as one or more groups each
 	local grouped_ingredients = {}
 
-	-- First consume all non-group requirements
-	-- This is done to avoid consuming a non-group item which
+	-- first consume all non-group requirements
+	-- this is done to avoid consuming a non-group item which
 	-- is also in a group
 	for key, count in pairs(consumption_with_groups) do
 		if key:sub(1, 6) == "group:" then
@@ -141,15 +141,15 @@ local function calculate_consumption(inv_index, consumption_with_groups)
 		return found == count_ingredient_groups
 	end
 
-	-- Next, resolve groups using the remaining items in the inventory
+	-- next, resolve groups using the remaining items in the inventory
 	if next(grouped_ingredients) ~= nil then
 		local take
 		for itemname, count in pairs(inv_index) do
 			if count > 0 then
 				-- groupname is the string as defined by recipe.
-				--  e.g. group:dye,color_blue
+				-- e.g. group:dye,color_blue
 				-- groups holds the group names split into a list
-				--  ready to be passed to core.get_item_group()
+				-- ready to be passed to core.get_item_group()
 				for groupname, groups in pairs(grouped_ingredients) do
 					if consumption_with_groups[groupname] > 0
 						and ingredient_groups_match_item(groups, itemname)
@@ -172,7 +172,7 @@ local function calculate_consumption(inv_index, consumption_with_groups)
 		end
 	end
 
-	-- Finally, check everything has been consumed
+	-- finally, check everything has been consumed
 	for key, count in pairs(consumption_with_groups) do
 		if count > 0 then
 			return nil
@@ -224,8 +224,8 @@ local function autocraft(inventory, craft, pos)
 	if not consumption then
 		return false
 	end
-	--Excludes buckets and non-stackable items
-	--LOGIC OF THE ADDED RESERVE
+	-- ixcludes buckets and non-stackable items
+	--  logic of the added reserve
 	local meta = core.get_meta(pos)
 	if meta:get_int("reserve") == 1 then
 		local total_in_inv = 0
@@ -235,20 +235,20 @@ local function autocraft(inventory, craft, pos)
 			local def = core.registered_items[itemname]
 			local stack_max = def and def.stack_max or 1
 			
-			--If the object is stackable
+			-- if the object is stackable
 			if stack_max > 1 then
 				total_needed = total_needed + number
 				total_in_inv = total_in_inv + (inv_index[itemname] or 0)
 			end
 		end
 
-		--If the total does not exceed the required total by at least 1, we stop.
+		-- if the total does not exceed the required total by at least 1, we stop.
 		if total_needed > 0 and total_in_inv <= total_needed then
 			return false
 		end
 	end
 
-	--Consumption of objects
+	-- consumption of objects
 	for itemname, number in pairs(consumption) do
 		for _ = 1, number do
 			inventory:remove_item("src", ItemStack(itemname))
@@ -440,7 +440,7 @@ end
 -- the third added an output inventory, changed the formspec and added a button
 --   for enabling/disabling
 -- so we work out way backwards on this history and update each single case
---   to the newest version
+--  to the newest version
 local function upgrade_autocrafter(pos, meta)
 	local meta = meta or core.get_meta(pos)
 	local inv = meta:get_inventory()
